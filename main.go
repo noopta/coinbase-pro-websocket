@@ -1,13 +1,23 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 	"github.com/preichenberger/go-coinbasepro/v2"
 )
+
+type bitcoinData struct {
+	DataType    string     `json:"clip"`
+	ProductID   string     `json:"product_id"`
+	Transaction [][]string `json:"changes"`
+	TimeStamp   string     `json:"time"`
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -75,12 +85,12 @@ func dialServer() {
 	subscribe := coinbasepro.Message{
 		Type: "subscribe",
 		Channels: []coinbasepro.MessageChannel{
-			coinbasepro.MessageChannel{
-				Name: "heartbeat",
-				ProductIds: []string{
-					"BTC-USD",
-				},
-			},
+			// coinbasepro.MessageChannel{
+			// 	Name: "heartbeat",
+			// 	ProductIds: []string{
+			// 		"BTC-USD",
+			// 	},
+			// },
 			coinbasepro.MessageChannel{
 				Name: "level2",
 				ProductIds: []string{
@@ -104,12 +114,57 @@ func dialServer() {
 			return
 		}
 
-		fmt.Println(string(msg))
+		transactionData := bitcoinData{}
+
+		err = json.Unmarshal([]byte(string(msg)), &transactionData)
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		if transactionData.Transaction != nil {
+			splitStrings := transactionData.Transaction[0]
+
+			buyAmount, err := strconv.ParseFloat(splitStrings[1], 32)
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			if splitStrings != nil && splitStrings[0] == "buy" && (buyAmount >= 100000) {
+				fmt.Println(transactionData)
+			}
+		}
+
+		// fmt.Println("*********")
+		// fmt.Println(transactionData)
+		// fmt.Println("parsed transaction")
+		// fmt.Println(string(msg))
+		// fmt.Println("*********")
+
+		// writeToFile(string(msg))
 
 		// uncomment below if you need send message to remote server
 		//if err = ws.WriteMessage(websocket.TextMessage, msg); err != nil {
 		//  return
 		//}
+	}
+}
+
+func writeToFile(msg string) {
+	f, err := os.Create("data.txt")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer f.Close()
+
+	_, err2 := f.WriteString(msg)
+
+	if err2 != nil {
+		log.Fatal(err2)
 	}
 }
 
