@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/preichenberger/go-coinbasepro/v2"
 )
 
 var upgrader = websocket.Upgrader{
@@ -58,8 +59,63 @@ func setupRoutes() {
 	http.HandleFunc("/ws", wsEndpoint)
 }
 
+func dialServer() {
+	ws, _, err := websocket.DefaultDialer.Dial("wss://ws-feed.exchange.coinbase.com", nil)
+	if err != nil {
+		panic(err)
+	}
+	defer ws.Close()
+
+	if err != nil {
+		fmt.Println("error reading")
+		fmt.Println(err)
+		return
+	}
+
+	subscribe := coinbasepro.Message{
+		Type: "subscribe",
+		Channels: []coinbasepro.MessageChannel{
+			coinbasepro.MessageChannel{
+				Name: "heartbeat",
+				ProductIds: []string{
+					"BTC-USD",
+				},
+			},
+			coinbasepro.MessageChannel{
+				Name: "level2",
+				ProductIds: []string{
+					"BTC-USD",
+				},
+			},
+		},
+	}
+
+	if err := ws.WriteJSON(subscribe); err != nil {
+		fmt.Println("error writing")
+		println(err.Error())
+		return
+	}
+
+	for {
+		fmt.Println("trying to read websocket data")
+		// Read a message from websocket connection
+		_, msg, err := ws.ReadMessage()
+		if err != nil {
+			return
+		}
+
+		fmt.Println(string(msg))
+
+		// uncomment below if you need send message to remote server
+		//if err = ws.WriteMessage(websocket.TextMessage, msg); err != nil {
+		//  return
+		//}
+	}
+}
+
 func main() {
 	fmt.Println("Hello World")
-	setupRoutes()
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// setupRoutes()
+	dialServer()
+	// log.Fatal(http.ListenAndServe(":8080", nil))
 }
