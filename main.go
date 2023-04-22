@@ -107,7 +107,6 @@ func dialServer() {
 	}
 
 	for {
-		fmt.Println("trying to read websocket data")
 		// Read a message from websocket connection
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
@@ -122,18 +121,22 @@ func dialServer() {
 			fmt.Println(err)
 		}
 
+		// fmt.Println(transactionData.Transaction)
 		if transactionData.Transaction != nil {
-			splitStrings := transactionData.Transaction[0]
+			i := 0
 
-			buyAmount, err := strconv.ParseFloat(splitStrings[1], 32)
+			for i = 0; i < len(transactionData.Transaction); i++ {
+				splitStrings := transactionData.Transaction[i]
+				buyAmount, err := strconv.ParseFloat(splitStrings[2], 32)
 
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
 
-			if splitStrings != nil && splitStrings[0] == "buy" && (buyAmount >= 100000) {
-				fmt.Println(transactionData)
+				if splitStrings != nil && splitStrings[0] == "buy" && (buyAmount >= 10) {
+					fmt.Println(transactionData)
+				}
 			}
 		}
 
