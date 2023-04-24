@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/preichenberger/go-coinbasepro/v2"
+	"github.com/twilio/twilio-go"
+	openapi "github.com/twilio/twilio-go/rest/api/v2010"
 )
 
 type bitcoinData struct {
@@ -23,6 +25,22 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     func(r *http.Request) bool { return true },
+}
+
+func sendSMS() {
+	client := twilio.NewRestClient()
+
+	params := &openapi.CreateMessageParams{}
+	params.SetTo(os.Getenv("TO_PHONE_NUMBER"))
+	params.SetFrom(os.Getenv("TWILIO_PHONE_NUMBER"))
+	params.SetBody("Hello from Golang!")
+
+	_, err := client.Api.CreateMessage(params)
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println("SMS sent successfully!")
+	}
 }
 
 func reader(conn *websocket.Conn) {
@@ -115,6 +133,8 @@ func dialServer() {
 
 		transactionData := bitcoinData{}
 
+		meanBitcoinPriceToday := 27498.84
+
 		err = json.Unmarshal([]byte(string(msg)), &transactionData)
 
 		if err != nil {
@@ -126,15 +146,41 @@ func dialServer() {
 			i := 0
 
 			for i = 0; i < len(transactionData.Transaction); i++ {
+
 				splitStrings := transactionData.Transaction[i]
 				buyAmount, err := strconv.ParseFloat(splitStrings[2], 32)
 
+				fmt.Println(splitStrings[1])
 				if err != nil {
 					fmt.Println(err)
+				}
+
+				currentBitcoinPrice, err := strconv.ParseFloat(splitStrings[1], 32)
+
+				if (meanBitcoinPriceToday / currentBitcoinPrice) > 1.10 {
+					fmt.Println("Bitcoin price is >= 10% market price")
+					fmt.Println(currentBitcoinPrice)
 					return
 				}
 
-				if splitStrings != nil && splitStrings[0] == "buy" && (buyAmount >= 10) {
+				if (meanBitcoinPriceToday / currentBitcoinPrice) < 0.90 {
+					fmt.Println("Bitcoin price is <= 10% below market price")
+					fmt.Println(currentBitcoinPrice)
+				}
+
+				if splitStrings != nil && splitStrings[0] == "buy" && (buyAmount >= 100) {
+					// buy order
+					// check how much investments we've already made
+					// if we can buy $500 and our monthly budget isn't complete, then buy
+					fmt.Println("Whale buy")
+					fmt.Println(transactionData)
+				}
+
+				if splitStrings != nil && splitStrings[0] == "sell" && (buyAmount >= 100) {
+					// buy order
+					// check how much investments we've already made
+					// if we can buy $500 and our monthly budget isn't complete, then buy
+					fmt.Println("Whale sell")
 					fmt.Println(transactionData)
 				}
 			}
@@ -174,6 +220,9 @@ func writeToFile(msg string) {
 func main() {
 	fmt.Println("Hello World")
 	// setupRoutes()
-	dialServer()
+	sendSMS()
+	return
+	// sendEmail()
+	// dialServer()
 	// log.Fatal(http.ListenAndServe(":8080", nil))
 }
