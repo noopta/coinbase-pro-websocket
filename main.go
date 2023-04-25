@@ -21,6 +21,13 @@ type bitcoinData struct {
 	TimeStamp   string     `json:"time"`
 }
 
+type tickerData struct {
+	ProductID string `json:"product_id"`
+	Price     string `json:"price"`
+	Side      string `json:"side"`
+	LastSize  string `json:"last_size"`
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -33,7 +40,7 @@ func sendSMS(orderType string, orderAmount float64) {
 	params := &openapi.CreateMessageParams{}
 	params.SetTo(os.Getenv("TO_PHONE_NUMBER"))
 	params.SetFrom(os.Getenv("TWILIO_PHONE_NUMBER"))
-	params.SetBody("A" + orderType + " order worth " + strconv.FormatFloat(orderAmount, 'E', -1, 32) + " was made")
+	params.SetBody("A " + orderType + " order worth of " + strconv.FormatFloat(orderAmount, 'E', -1, 32) + " Bitcoin was made")
 
 	_, err := client.Api.CreateMessage(params)
 	if err != nil {
@@ -110,7 +117,7 @@ func dialServer() {
 			// 	},
 			// },
 			coinbasepro.MessageChannel{
-				Name: "level2",
+				Name: "ticker",
 				ProductIds: []string{
 					"BTC-USD",
 				},
@@ -131,59 +138,66 @@ func dialServer() {
 			return
 		}
 
-		transactionData := bitcoinData{}
+		coinData := tickerData{}
 
-		meanBitcoinPriceToday := 27498.84
+		// meanBitcoinPriceToday := 27373.12
 
-		err = json.Unmarshal([]byte(string(msg)), &transactionData)
+		err = json.Unmarshal([]byte(string(msg)), &coinData)
 
 		if err != nil {
 			fmt.Println(err)
 		}
 
 		// fmt.Println(transactionData.Transaction)
-		if transactionData.Transaction != nil {
-			i := 0
+		if coinData.Price != "" {
+			fmt.Println(coinData)
+			orderAmount, err := strconv.ParseFloat(coinData.LastSize, 5)
 
-			for i = 0; i < len(transactionData.Transaction); i++ {
-
-				splitStrings := transactionData.Transaction[i]
-				orderAmount, err := strconv.ParseFloat(splitStrings[2], 64)
-
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				currentBitcoinPrice, err := strconv.ParseFloat(splitStrings[1], 64)
-
-				if (meanBitcoinPriceToday / currentBitcoinPrice) > 1.10 {
-					fmt.Println("Bitcoin price is >= 10% market price")
-					fmt.Println(currentBitcoinPrice)
-				}
-
-				if (meanBitcoinPriceToday / currentBitcoinPrice) < 0.90 {
-					fmt.Println("Bitcoin price is <= 10% below market price")
-					fmt.Println(currentBitcoinPrice)
-				}
-
-				if splitStrings != nil && splitStrings[0] == "buy" && (orderAmount >= 200) {
-					// buy order
-					// check how much investments we've already made
-					// if we can buy $500 and our monthly budget isn't complete, then buy
-					sendSMS(splitStrings[0], orderAmount)
-					fmt.Println("Whale buy")
-					fmt.Println(transactionData)
-				}
-
-				if splitStrings != nil && splitStrings[0] == "sell" && (orderAmount >= 100) {
-					// buy order
-					// check how much investments we've already made
-					// if we can buy $500 and our monthly budget isn't complete, then buy
-					sendSMS(splitStrings[0], orderAmount)
-					fmt.Println("Whale sell")
-					fmt.Println(transactionData)
-				}
+			if err != nil {
+				fmt.Println(err)
 			}
+
+			if orderAmount >= 10.0 {
+				fmt.Println("Somoeone bought >= 10 BTC")
+				sendSMS(coinData.Side, orderAmount)
+			}
+
+			// splitStrings := transactionData.Transaction[i]
+			// orderAmount, err := strconv.ParseFloat(splitStrings[2], 64)
+
+			// if err != nil {
+			// 	fmt.Println(err)
+			// }
+
+			// currentBitcoinPrice, err := strconv.ParseFloat(splitStrings[1], 64)
+
+			// if (meanBitcoinPriceToday / currentBitcoinPrice) > 1.10 {
+			// 	fmt.Println("Bitcoin price is >= 10% market price")
+			// 	fmt.Println(currentBitcoinPrice)
+			// }
+
+			// if (meanBitcoinPriceToday / currentBitcoinPrice) < 0.90 {
+			// 	fmt.Println("Bitcoin price is <= 10% below market price")
+			// 	fmt.Println(currentBitcoinPrice)
+			// }
+
+			// if splitStrings != nil && splitStrings[0] == "buy" && (orderAmount >= 200) {
+			// 	// buy order
+			// 	// check how much investments we've already made
+			// 	// if we can buy $500 and our monthly budget isn't complete, then buy
+			// 	sendSMS(splitStrings[0], orderAmount)
+			// 	fmt.Println("Whale buy")
+			// 	fmt.Println(transactionData)
+			// }
+
+			// if splitStrings != nil && splitStrings[0] == "sell" && (orderAmount >= 100) {
+			// 	// buy order
+			// 	// check how much investments we've already made
+			// 	// if we can buy $500 and our monthly budget isn't complete, then buy
+			// 	sendSMS(splitStrings[0], orderAmount)
+			// 	fmt.Println("Whale sell")
+			// 	fmt.Println(transactionData)
+			// }
 		}
 
 		// fmt.Println("*********")
