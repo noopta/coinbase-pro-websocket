@@ -34,13 +34,18 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-func sendSMS(orderType string, orderAmount float64) {
+func sendSMS(orderType string, orderAmount float64, isPriceNotif bool) {
 	client := twilio.NewRestClient()
 
 	params := &openapi.CreateMessageParams{}
 	params.SetTo(os.Getenv("TO_PHONE_NUMBER"))
 	params.SetFrom(os.Getenv("TWILIO_PHONE_NUMBER"))
-	params.SetBody("A " + orderType + " order worth of " + strconv.FormatFloat(orderAmount, 'E', -1, 32) + " Bitcoin was made")
+
+	if isPriceNotif {
+		params.SetBody("The price of Bitcoin is >= 5% higher than $" + orderType + ", with a current value of $" + strconv.FormatFloat(orderAmount, 'E', -1, 32))
+	} else {
+		params.SetBody("A " + orderType + " order worth of " + strconv.FormatFloat(orderAmount, 'E', -1, 32) + " Bitcoin was made")
+	}
 
 	_, err := client.Api.CreateMessage(params)
 	if err != nil {
@@ -131,6 +136,9 @@ func dialServer() {
 		return
 	}
 
+	i := 0
+	globalPrice := 0.0
+
 	for {
 		// Read a message from websocket connection
 		_, msg, err := ws.ReadMessage()
@@ -147,19 +155,41 @@ func dialServer() {
 		if err != nil {
 			fmt.Println(err)
 		}
+		// 28396.3
 
 		// fmt.Println(transactionData.Transaction)
 		if coinData.Price != "" {
+
+			if i == 0 {
+				globalPrice, err = strconv.ParseFloat(coinData.Price, 10)
+
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+
+			i += 1
 			fmt.Println(coinData)
+
 			orderAmount, err := strconv.ParseFloat(coinData.LastSize, 5)
 
 			if err != nil {
 				fmt.Println(err)
 			}
 
+			currentPrice, err := strconv.ParseFloat(coinData.Price, 10)
+
+			if err != nil {
+				fmt.Println(err)
+			}
+
 			if orderAmount >= 10.0 {
-				fmt.Println("Somoeone bought >= 10 BTC")
-				sendSMS(coinData.Side, orderAmount)
+				fmt.Println("Someone bought >= 10 BTC")
+				sendSMS(coinData.Side, orderAmount, false)
+			}
+
+			if (currentPrice / globalPrice) >= 1.05 {
+				sendSMS(coinData.Price, globalPrice, true)
 			}
 
 			// splitStrings := transactionData.Transaction[i]
